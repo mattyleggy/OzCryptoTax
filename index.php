@@ -5,16 +5,11 @@ class CoinspotData {
   private $portfolio;
   private $capitalGain;
   private $capitalLoss;
-  public function __construct($ausDollars) {
+  public function __construct() {
     $this->csvData = array();
     $this->portfolio = array();
     $this->capitalGain = 0;
     $this->capitalLoss = 0;
-    $this->portfolio["AUD"][0] = array(
-        "amount" => $ausDollars,
-        "aud-cost-per-coin" => 1,
-        "aud-total" => $ausDollars
-    );
   }
 
   private function importCSV($location) {
@@ -112,16 +107,49 @@ class CoinspotData {
     );
   }
 
+  private function addToGain($gain) {
+    $this->capitalGain += $gain;
+  }
+
+  private function addToLoss($loss) {
+    $this->capitalLoss += $loss;
+  }
+
+  private function addTaxEvent($sellPrice,$boughtAtPrice) {
+    $amount = abs($sellPrice-$boughtAtPrice);
+    if ($sellPrice > $boughtAtPrice) {
+      //echo $amount."|profit ------------------------------------------------------------ \r";
+      $this->addToGain($amount);
+    } else {
+      //echo "------------------------------------------------------------".$amount."|loss  \r";
+      $this->addToLoss($amount);
+    }
+  }
+
   private function removeFromPortfolio($coin,$order) {
     $keys = array_keys($this->portfolio[$coin]);
     $totalToSell = $order["amount"]; //the amount to be removed from portfolio
-    foreach($keys as $k=>$v) {      
-      if ($totalToSell >= $this->portfolio[$coin][$v]["amount"]) {
+    foreach($keys as $k=>$v) {
+      $break = 0;
+      $currentAmount = $this->portfolio[$coin][$v]["amount"];
+      if ($totalToSell >= $currentAmount) {
+        $sellPrice = $this->portfolio[$coin][$v]["amount"]*($order["aud"]/$order["amount"]);
+        $boughtAtPrice =$this->portfolio[$coin][$v]["amount"]*$this->portfolio[$coin][$v]["aud-cost-per-coin"];
         $this->portfolio[$coin][$v]["amount"] = 0;
         $totalToSell -= $v["amount"];
         unset($this->portfolio[$coin][$v]);
       } else {
+        $sellPrice = $totalToSell*($order["aud"]/$order["amount"]);
+        $boughtAtPrice = $totalToSell*$this->portfolio[$coin][$v]["aud-cost-per-coin"];
         $this->portfolio[$coin][$v]["amount"] -= $totalToSell;
+        $break = 1;
+      }
+
+      if ($coin != "AUD") {        
+        $this->addTaxEvent($sellPrice,$boughtAtPrice);
+      }
+
+      if ($break){
         break 1;
       }
     }
@@ -141,6 +169,14 @@ class CoinspotData {
     return $portfolio;
   }
 
+  public function getGainAndLoss() {
+    return array(
+      "gain" => $this->capitalGain,
+      "loss" => $this->capitalLoss,
+      "total_gain" => ($this->capitalGain-$this->capitalLoss)
+    );
+  }
+
   public function calculateCapitalGains($csvLocation) {
     //import CSV data into array
     $this->importCSV($csvLocation);
@@ -156,9 +192,10 @@ class CoinspotData {
 
     $portfolio = $this->getPortfolio();
     //print_r($portfolio);
+    print_r($this->getGainAndLoss());
   }
 }
 
-$coinspot = new CoinspotData(4000);
+$coinspot = new CoinspotData();
 $coinspot->calculateCapitalGains("orders.csv");
 ?>
