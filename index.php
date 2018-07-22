@@ -1,5 +1,10 @@
 <?php
-//First In, First Out method
+/**
+ * This uses the First In, First Out method when calculating capital gains and losses.
+ * This is for my own personal use, don't rely on it as it could be incorrect.
+ * I won't be held liable if you use this tool and it give incorrect amounts.
+ */
+ 
 class CoinspotData {
   private $csvData;
   private $portfolio;
@@ -118,10 +123,8 @@ class CoinspotData {
   private function addTaxEvent($sellPrice,$boughtAtPrice) {
     $amount = abs($sellPrice-$boughtAtPrice);
     if ($sellPrice > $boughtAtPrice) {
-      //echo $amount."|profit ------------------------------------------------------------ \r";
       $this->addToGain($amount);
     } else {
-      //echo "------------------------------------------------------------".$amount."|loss  \r";
       $this->addToLoss($amount);
     }
   }
@@ -145,9 +148,10 @@ class CoinspotData {
         $break = 1;
       }
 
-      if ($coin != "AUD") {        
-        $this->addTaxEvent($sellPrice,$boughtAtPrice);
+      if ($coin == "AUD") {
+        echo $coin."|".$totalToSell."|".$sellPrice."|".$boughtAtPrice."\r";
       }
+      $this->addTaxEvent($sellPrice,$boughtAtPrice);
 
       if ($break){
         break 1;
