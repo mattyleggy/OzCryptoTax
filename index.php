@@ -10,7 +10,11 @@ class CoinspotData {
     $this->portfolio = array();
     $this->capitalGain = 0;
     $this->capitalLoss = 0;
-    //$this->portfolio["AUD"][22] = $ausDollars;
+    $this->portfolio["AUD"][0] = array(
+        "amount" => $ausDollars,
+        "aud-cost-per-coin" => 1,
+        "aud-total" => $ausDollars
+    );
   }
 
   private function importCSV($location) {
@@ -62,10 +66,20 @@ class CoinspotData {
   public function analyseRows() {
     $data = $this->getData();
     foreach($data as $key=>$order) {
+      //convert this to use the be modular instead of repeated code for Buy&Sell
       if ($order["type"] == "Buy") {
-        $coin = explode("/",$order["market"]);
+        $coin = explode("/",$order["market"]); //convert to RegEx at some point if bothered to
         $coinPurchased = $coin[0];
+        $coinSold = $coin[1];
         $this->addToPortfolio($coinPurchased,$order);
+
+        $total = explode(" ",$order["total"]);
+        $totalCoin = $total[0];
+        $this->removeFromPortfolio($coinSold, array(
+          "timestamp" => $order["timestamp"],
+          "amount" => $totalCoin,
+          "aud" => $order["aud"]
+        ));
       }
 
       if ($order["type"] == "Sell") {
@@ -101,11 +115,9 @@ class CoinspotData {
   private function removeFromPortfolio($coin,$order) {
     $keys = array_keys($this->portfolio[$coin]);
     $totalToSell = $order["amount"]; //the amount to be removed from portfolio
-    foreach($keys as $k=>$v) {
-      if ($totalToSell > $v["amount"]) {
+    foreach($keys as $k=>$v) {      
+      if ($totalToSell >= $this->portfolio[$coin][$v]["amount"]) {
         $this->portfolio[$coin][$v]["amount"] = 0;
-        //need to remove from $portfolio
-        //calculate gain or loss
         $totalToSell -= $v["amount"];
         unset($this->portfolio[$coin][$v]);
       } else {
@@ -119,9 +131,14 @@ class CoinspotData {
   }
 
   public function getPortfolio() {
-    foreach ($this->portfolio as $key=>$val) {
-
+    $portfolio = array();
+    foreach ($this->portfolio as $coin=>$allCoins) {
+      foreach($this->portfolio[$coin] as $timestamp=>$v) {
+        $portfolio[$coin]["amount"] += $v["amount"];
+        $portfolio[$coin]["bought-with-aud"] += $v["aud-total"];
+      }
     }
+    return $portfolio;
   }
 
   public function calculateCapitalGains($csvLocation) {
@@ -136,9 +153,12 @@ class CoinspotData {
 
     $data = $this->getData();
     print_r($this->portfolio);
+
+    $portfolio = $this->getPortfolio();
+    //print_r($portfolio);
   }
 }
 
-$coinspot = new CoinspotData(400);
+$coinspot = new CoinspotData(4000);
 $coinspot->calculateCapitalGains("orders.csv");
 ?>
